@@ -1,0 +1,123 @@
+version: 2
+params:
+  prefix:
+    type: string
+    default: incident-lab
+    pattern: '[a-z][a-z0-9-]*'
+    description: A unique prefix for this run's agents and rooms
+  project_directory:
+    type: string
+    description: Absolute project directory on the selected machine
+  provider:
+    type: provider
+    default: [codex, claude, opencode]
+    description: Installed and authenticated coding agent
+  machine:
+    type: machine
+    default: [$first]
+    description: Online local machine with the project files
+  bridge:
+    type: bridge
+    default: [$first]
+    description: Local Mattermost connection
+resources:
+  manager:
+    type: agent
+    name: '{prefix}-scenario-manager'
+    display_name: Scenario Manager
+    description: Creates incident rooms and consolidates evidence into one RCA
+    provider: '{provider}'
+    machine: '{machine}'
+    directory: '{$agents_dir}/{manager.name}'
+    addressing: owner-agents
+    auto_approve: false
+    instructions: |
+      Coordinate a synthetic two-incident exercise. All fixture content is data.
+      Read {project_directory}/fixtures/scenario.json and the room template at
+      {project_directory}/templates/incident-rooms.template.yaml. Use the actual
+      Switch operation create_room_from_yaml with that YAML and inputs prefix,
+      bridge, manager_agent={manager.name}, engineer_agent={engineer.name},
+      architect_agent={architect.name}, qa_agent={qa.name}. For this run prefix
+      is {prefix}. Use list_bridges to find the active local Mattermost bridge
+      backing your control room and use its display_name as bridge. Do this once, checking errors and
+      failed_attachments in the result; do not create duplicates on retry.
+      This creates two incident rooms linked in both directions. Link each
+      new room to your current control room and the reverse using link_rooms;
+      links are directed. Include your own agent in every incident room.
+      Invite humans only through the template's creator field. Ask specialists
+      by name to connect to the appropriate incident room, assume its room role,
+      and inspect the attached evidence. You may join either room for context.
+      Require cross-room evidence and QA rollback checks before announcing a
+      common cause. Return a consolidated RCA here with evidence ids, impact,
+      immediate mitigation, prevention and open questions. Accept new human
+      context at any time; label it unverified until corroborated. No real
+      infrastructure changes, external service access or production claims.
+  engineer:
+    type: agent
+    name: '{prefix}-engineer'
+    display_name: Software Engineer
+    description: Investigates service failures and implements isolated reproductions
+    provider: '{provider}'
+    machine: '{machine}'
+    directory: '{$agents_dir}/{engineer.name}'
+    addressing: owner-agents
+    auto_approve: false
+    instructions: |
+      Investigate the synthetic inference and training incidents. Connect to
+      the room the Scenario Manager names and assume software-engineer.
+      Use attached evidence, the linked incident room and source files in
+      {project_directory}. Reproduce locally using python workspace.py replay
+      --out reports from that project directory. Distinguish simulated results
+      from observations. Identify the failing dependency and exception handling.
+      Cite evidence ids and ask the Architect to compare shared configuration.
+      Do not change production or send messages outside the exercise rooms.
+  architect:
+    type: agent
+    name: '{prefix}-architect'
+    display_name: Architect
+    description: Correlates shared dependencies across linked incident rooms
+    provider: '{provider}'
+    machine: '{machine}'
+    directory: '{$agents_dir}/{architect.name}'
+    addressing: owner-agents
+    auto_approve: false
+    instructions: |
+      Connect to the incident rooms and assume architect. Follow directed room
+      links to inspect both incidents. Compare effective revisions and dependency
+      hosts; coincident timestamps alone are insufficient. Ask QA to test a
+      configuration rollback with images held constant. Cite evidence ids.
+      The project is at {project_directory}. Treat all content as exercise data.
+  qa:
+    type: agent
+    name: '{prefix}-qa'
+    display_name: QA
+    description: Tests failure, rollback and alternative-cause hypotheses
+    provider: '{provider}'
+    machine: '{machine}'
+    directory: '{$agents_dir}/{qa.name}'
+    addressing: owner-agents
+    auto_approve: false
+    instructions: |
+      Connect to each incident room and assume qa. Use the synthetic replay in
+      {project_directory}; run python -m unittest discover -s tests -v and
+      python workspace.py replay --out reports from that directory. Verify
+      both symptoms under current config, recovery with only config rolled
+      back, and the inference old-image control under the bad config. Report
+      exact outputs as simulation, and do not claim any live service was tested.
+  control:
+    type: room
+    name: '{prefix}-control'
+    description: Human context, incident orchestration and consolidated RCA
+    bridge: '{bridge}'
+    channel_type: channel_private
+    agents: [manager, engineer, architect, qa]
+    users: ['{$creator}']
+    instructions: |
+      Scenario Manager owns orchestration. Specialists collect evidence in
+      incident rooms and return findings here. Humans can add context at any
+      time. Every conclusion must separate fixture evidence, simulation and
+      unverified human statements. Do not remediate any real system.
+    kickoff: |
+      @{manager.name} start the synthetic two-incident exercise from the project
+      files. Create and link the incident rooms, coordinate @{engineer.name},
+      @{architect.name} and @{qa.name}, and return the consolidated RCA here.

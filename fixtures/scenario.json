@@ -1,0 +1,49 @@
+{
+  "name": "Shared feature-store configuration incident",
+  "clock": "2026-01-15T15:00:00Z",
+  "healthy_endpoint": "http://feature-store.ml.svc.cluster.local:8080",
+  "configs": {
+    "previous": {
+      "revision": "cfg-183",
+      "endpoint": "http://feature-store.ml.svc.cluster.local:8080"
+    },
+    "current": {
+      "revision": "cfg-184",
+      "endpoint": "http://feature-store.ml.svc.cluser.local:8080"
+    }
+  },
+  "changes": [
+    {"id": "DEPLOY-42", "time": "2026-01-15T08:55:00Z", "kind": "inference-image", "before": "infer:1.7.0", "after": "infer:1.8.0"},
+    {"id": "CFG-184", "time": "2026-01-15T08:58:00Z", "kind": "shared-config", "before": "cfg-183", "after": "cfg-184"}
+  ],
+  "incidents": [
+    {
+      "id": "INC-101",
+      "room": "inference-500",
+      "service": "inference",
+      "image": "infer:1.8.0",
+      "config_revision": "cfg-184",
+      "started": "2026-01-15T09:00:00Z",
+      "summary": "Inference began returning HTTP 500 after a deployment.",
+      "evidence": [
+        {"id": "INF-LOG", "kind": "error", "detail": "Feature lookup failed: DNS NXDOMAIN for feature-store.ml.svc.cluser.local"},
+        {"id": "INF-CFG", "kind": "config", "detail": "Effective configuration revision cfg-184; only the feature-store dependency is unavailable."}
+      ]
+    },
+    {
+      "id": "INC-102",
+      "room": "training-frozen",
+      "service": "training",
+      "image": "trainer:2.4.1",
+      "config_revision": "cfg-184",
+      "started": "2026-01-15T09:00:00Z",
+      "summary": "Recommendation training is RUNNING but has made no progress for six hours.",
+      "duration_hours": 6,
+      "retry_interval_seconds": 60,
+      "evidence": [
+        {"id": "TRAIN-LOG", "kind": "error", "detail": "Feature download retries indefinitely: DNS NXDOMAIN for feature-store.ml.svc.cluser.local"},
+        {"id": "TRAIN-CFG", "kind": "config", "detail": "Effective configuration revision cfg-184; no training image deployment occurred."}
+      ]
+    }
+  ]
+}

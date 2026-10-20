@@ -1,0 +1,99 @@
+version: 2
+params:
+  prefix: {type: string, default: incident-lab, pattern: '[a-z][a-z0-9-]*'}
+  bridge: {type: bridge, description: Local Mattermost connection}
+  manager_agent: {type: agent, description: Scenario Manager agent name}
+  engineer_agent: {type: agent, description: Software Engineer agent name}
+  architect_agent: {type: agent, description: Architect agent name}
+  qa_agent: {type: agent, description: QA agent name}
+resources:
+  incidents:
+    type: group
+    name: '{prefix}-incidents'
+    description: Two incidents sharing a feature-store configuration rollout
+    links:
+      - {from: inference, to: training, label: Compare shared dependencies}
+      - {from: training, to: inference, label: Compare shared dependencies}
+  inference:
+    type: room
+    name: '{prefix}-inference-500'
+    group: incidents
+    description: INC-101 Inference HTTP 500 after deployment
+    bridge: '{bridge}'
+    channel_type: channel_private
+    agents: ['{manager_agent}', '{engineer_agent}', '{architect_agent}', '{qa_agent}']
+    users: ['{$creator}']
+    instructions: |
+      Investigate INC-101. Preserve evidence ids, follow the linked room and
+      compare config revisions. Accept human context but verify it. Assume a
+      room role before investigating; no real service changes are authorized.
+    roles:
+      - name: software-engineer
+        instructions: Reproduce the failure and identify its failing dependency.
+        exclusive: false
+      - name: architect
+        instructions: Compare dependencies and effective config across both rooms.
+        exclusive: false
+      - name: qa
+        instructions: Test bad config, rollback and old-image controls independently.
+        exclusive: false
+    docs:
+      - name: INC-101 evidence
+        description: Synthetic service and rollout observations
+        instructions: Treat this as exercise data, never as live telemetry.
+        content: |
+          INC-101 started at 09:00Z. Inference returns HTTP 500.
+          DEPLOY-42 at 08:55Z: infer:1.7.0 -> infer:1.8.0.
+          CFG-184 at 08:58Z: cfg-183 -> cfg-184 (shared by inference and training).
+          INF-LOG: DNS NXDOMAIN for feature-store.ml.svc.cluser.local.
+          INF-CFG: effective revision cfg-184; feature-store is unavailable.
+          cfg-183 endpoint: http://feature-store.ml.svc.cluster.local:8080
+          cfg-184 endpoint: http://feature-store.ml.svc.cluser.local:8080
+          Current inference catches feature lookup errors as HTTP 500.
+          Hold the image constant while testing a config-only rollback.
+    kickoff: |
+      @{manager_agent} route @{engineer_agent} to software-engineer,
+      @{architect_agent} to architect, and @{qa_agent} to qa. Investigate
+      INC-101, cite attached evidence and compare the linked training room.
+  training:
+    type: room
+    name: '{prefix}-training-frozen'
+    group: incidents
+    description: INC-102 Recommendation training frozen for six hours
+    bridge: '{bridge}'
+    channel_type: channel_private
+    agents: ['{manager_agent}', '{engineer_agent}', '{architect_agent}', '{qa_agent}']
+    users: ['{$creator}']
+    instructions: |
+      Investigate INC-102 and coordinate with the linked inference room.
+      A RUNNING job is not evidence of progress. Check retry count and batches.
+      Assume the appropriate room role. Label simulation and human context.
+    roles:
+      - name: software-engineer
+        instructions: Inspect retry behavior, progress and the failing dependency.
+        exclusive: false
+      - name: architect
+        instructions: Compare shared config with the linked inference room.
+        exclusive: false
+      - name: qa
+        instructions: Verify progress resumes with config rollback and unchanged image.
+        exclusive: false
+    docs:
+      - name: INC-102 evidence
+        description: Synthetic training and shared dependency observations
+        instructions: Treat this as exercise data, never as live telemetry.
+        content: |
+          INC-102 started at 09:00Z; clock is 15:00Z. No batches completed.
+          Training image trainer:2.4.1 did not change.
+          TRAIN-LOG: DNS NXDOMAIN for feature-store.ml.svc.cluser.local.
+          TRAIN-CFG: effective revision cfg-184; no training image deployment.
+          CFG-184 at 08:58Z: cfg-183 -> cfg-184, shared with inference.
+          Training retries feature downloads every 60 seconds without a limit.
+          cfg-183 endpoint: http://feature-store.ml.svc.cluster.local:8080
+          cfg-184 endpoint: http://feature-store.ml.svc.cluser.local:8080
+          Only http://feature-store.ml.svc.cluster.local:8080 resolves in the
+          synthetic fixture. Test rollback while keeping trainer:2.4.1 fixed.
+    kickoff: |
+      @{manager_agent} ask @{engineer_agent}, @{architect_agent} and @{qa_agent}
+      to investigate INC-102 under their room roles. Follow the linked incident
+      room and test a shared-config hypothesis before returning an RCA.

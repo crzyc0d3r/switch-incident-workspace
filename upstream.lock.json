@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/sandbox-quantum/switch.git",
+  "commit": "98bac5db930321111637cfde43df8296e2e328fe",
+  "core_version": "0.30.0",
+  "compose_contract": "stack-compose:1",
+  "mattermost_image": "mattermost/mattermost-team-edition:11.9.0",
+  "postgres_image": "postgres:16-alpine"
+}
